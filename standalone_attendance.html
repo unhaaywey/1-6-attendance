@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>출석 관리 시스템</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #2c3e50; font-size: 2.5em; margin-bottom: 10px; }
+        .nav { display: flex; justify-content: center; margin-bottom: 30px; background: white; border-radius: 15px; padding: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .nav button { background: none; border: none; padding: 15px 25px; margin: 0 5px; border-radius: 10px; cursor: pointer; font-size: 16px; transition: all 0.3s; }
+        .nav button.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .nav button:hover:not(.active) { background: #f8f9fa; }
+        .tab-content { display: none; background: white; border-radius: 15px; padding: 30px; box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        .attendance-form { text-align: center; margin-bottom: 30px; }
+        .attendance-form input { padding: 15px; font-size: 18px; border: 2px solid #e1e8ed; border-radius: 10px; margin: 10px; width: 200px; }
+        .attendance-form button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 10px; cursor: pointer; margin: 10px; transition: all 0.3s; }
+        .attendance-form button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.3); }
+        .status { text-align: center; margin: 20px 0; padding: 15px; border-radius: 10px; font-size: 18px; font-weight: bold; }
+        .early { background: #d4edda; color: #155724; }
+        .ontime { background: #e7f3ff; color: #0066cc; }
+        .late { background: #f8d7da; color: #721c24; }
+        .records { margin-top: 30px; }
+        .record-item { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 20px; }
+        .calendar-header { font-weight: bold; padding: 10px; text-align: center; background: #6c757d; color: white; border-radius: 5px; }
+        .calendar-day { padding: 15px 10px; text-align: center; border-radius: 8px; cursor: pointer; transition: all 0.3s; min-height: 60px; }
+        .calendar-day:hover { transform: scale(1.05); }
+        .calendar-day.today { border: 2px solid #007bff; }
+        .calendar-day.early { background: #c8e6c9; }
+        .calendar-day.late { background: #ffcdd2; }
+        .calendar-day.ontime { background: #e1f5fe; }
+        .calendar-day.empty { background: #f5f5f5; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
+        .stat-card { background: linear-gradient(135deg, #ffeaa7, #fab1a0); padding: 20px; border-radius: 15px; text-align: center; color: #2d3436; }
+        .stat-card.early { background: linear-gradient(135deg, #a8e6cf, #88d8a3); }
+        .stat-card.late { background: linear-gradient(135deg, #fd79a8, #fdcb6e); }
+        .stat-number { font-size: 2em; font-weight: bold; margin-bottom: 10px; }
+        .month-nav { display: flex; justify-content: center; align-items: center; margin: 20px 0; }
+        .month-nav button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 5px; margin: 0 10px; cursor: pointer; }
+        .month-nav h3 { margin: 0 20px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 5% auto; padding: 30px; width: 90%; max-width: 600px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); max-height: 80vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; }
+        .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: #000; }
+        .daily-record { background: #f8f9fa; padding: 15px; margin: 10px 0; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid #dee2e6; }
+        .daily-record.early { border-left-color: #28a745; background: #d4edda; }
+        .daily-record.late { border-left-color: #dc3545; background: #f8d7da; }
+        .daily-record.ontime { border-left-color: #007bff; background: #e7f3ff; }
+        .url-info { margin-top: 15px; padding: 15px; background: #e7f3ff; border-radius: 10px; font-size: 14px; color: #0066cc; border: 2px solid #b3d9ff; }
+        @media (max-width: 768px) {
+            .nav { flex-direction: column; }
+            .stats { grid-template-columns: 1fr; }
+            .calendar { grid-template-columns: repeat(7, 1fr); font-size: 12px; }
+            .calendar-day { padding: 8px 4px; min-height: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 출석 관리 시스템</h1>
+        </div>
+        
+        <nav class="nav">
+            <button class="tab-btn active" data-tab="attendance">출석체크</button>
+            <button class="tab-btn" data-tab="calendar">달력보기</button>
+            <button class="tab-btn" data-tab="stats">월별통계</button>
+        </nav>
+
+        <div id="attendance" class="tab-content active">
+            <div class="attendance-form">
+                <input type="text" id="studentName" placeholder="이름을 입력하세요">
+                <button onclick="checkAttendance()">출석체크</button>
+                <div class="url-info">
+                    <strong>🔗 URL 사용법:</strong><br>
+                    현재 URL: <span id="currentUrl"></span><br>
+                    개인별 링크: <strong>이 URL + ?name=학생이름</strong><br>
+                    예시: <code id="exampleUrl"></code>
+                </div>
+            </div>
+            <div id="attendanceStatus"></div>
+            <div class="records">
+                <h3>📋 오늘의 출석 기록</h3>
+                <div id="todayRecords"></div>
+            </div>
+        </div>
+
+        <div id="calendar" class="tab-content">
+            <div class="month-nav">
+                <button onclick="changeMonth(-1)">◀</button>
+                <h3 id="currentMonth"></h3>
+                <button onclick="changeMonth(1)">▶</button>
+            </div>
+            <div class="calendar" id="attendanceCalendar"></div>
+        </div>
+
+        <div id="stats" class="tab-content">
+            <div class="month-nav">
+                <button onclick="changeStatsMonth(-1)">◀</button>
+                <h3 id="statsMonth"></h3>
+                <button onclick="changeStatsMonth(1)">▶</button>
+            </div>
+            <div class="stats" id="monthlyStats"></div>
+        </div>
+    </div>
+
+    <div id="dailyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalDate"></h3>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentDate = new Date();
+        let statsDate = new Date();
+        
+        // 페이지 로드시 URL 정보 표시 및 이름 파라미터 처리
+        window.addEventListener('load', () => {
+            // 현재 URL 표시
+            const currentUrl = window.location.origin + window.location.pathname;
+            document.getElementById('currentUrl').textContent = currentUrl;
+            document.getElementById('exampleUrl').textContent = currentUrl + '?name=홍길동';
+            
+            // URL에서 이름 파라미터 가져오기
+            const urlParams = new URLSearchParams(window.location.search);
+            const nameParam = urlParams.get('name');
+            if (nameParam) {
+                const nameInput = document.getElementById('studentName');
+                nameInput.value = decodeURIComponent(nameParam);
+                document.getElementById('attendanceStatus').innerHTML = 
+                    `<div class="status ontime">✨ ${nameParam}님 환영합니다! 출석체크 버튼을 눌러주세요.</div>`;
+            }
+            
+            updateTodayRecords();
+        });
+
+        // 탭 전환
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(tab).classList.add('active');
+                
+                if (tab === 'calendar') updateCalendar();
+                if (tab === 'stats') updateStats();
+            });
+        });
+
+        // 출석체크 함수
+        function checkAttendance() {
+            const name = document.getElementById('studentName').value.trim();
+            if (!name) {
+                alert('이름을 입력해주세요!');
+                return;
+            }
+
+            const now = new Date();
+            const timeStr = now.toTimeString().slice(0,5);
+            const dateStr = now.toLocaleDateString('ko-KR');
+            const hour = now.getHours();
+            const minute = now.getMinutes();
+            const totalMinutes = hour * 60 + minute;
+
+            let status = 'ontime';
+            let statusText = '정시 출석';
+            let statusClass = 'ontime';
+
+            if (totalMinutes < 450) { // 7:30 이전
+                status = 'early';
+                statusText = '🌅 얼리버드';
+                statusClass = 'early';
+            } else if (totalMinutes > 470) { // 7:50 이후
+                status = 'late';
+                statusText = '⏰ 지각';
+                statusClass = 'late';
+            }
+
+            // 기록 저장
+            const record = { name, time: timeStr, date: dateStr, status, timestamp: now.getTime() };
+            let records = JSON.parse(localStorage.getItem('attendanceRecords') || '[]');
+            
+            // 같은 날 같은 사람의 중복 기록 방지
+            const existingIndex = records.findIndex(r => r.name === name && r.date === dateStr);
+            if (existingIndex >= 0) {
+                records[existingIndex] = record;
+            } else {
+                records.push(record);
+            }
+            
+            localStorage.setItem('attendanceRecords', JSON.stringify(records));
+
+            // 상태 표시
+            document.getElementById('attendanceStatus').innerHTML = 
+                `<div class="status ${statusClass}">✅ ${name}님 ${statusText} (${timeStr})</div>`;
+
+            updateTodayRecords();
+        }
+
+        // 오늘의 기록 업데이트
+        function updateTodayRecords() {
+            const today = new Date().toLocaleDateString('ko-KR');
+            const records = JSON.parse(localStorage.getItem('attendanceRecords') || '[]')
+                .filter(r => r.date === today)
+                .sort((a,b) => a.timestamp - b.timestamp);
+
+            const container = document.getElementById('todayRecords');
+            container.innerHTML = records.map(r => 
+                `<div class="record-item ${r.status}">
+                    <span>${r.name}</span>
+                    <span>${r.time} ${r.status === 'early' ? '🌅' : r.status === 'late' ? '⏰' : '✅'}</span>
+                </div>`
+            ).join('') || '<p>아직 출석 기록이 없습니다.</p>';
+        }
+
+        // 달력 업데이트
+        function updateCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            document.getElementById('currentMonth').textContent = 
+                `${year}년 ${month + 1}월`;
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+
+            const calendar = document.getElementById('attendanceCalendar');
+            calendar.innerHTML = '';
+
+            // 요일 헤더
+            ['일', '월', '화', '수', '목', '금', '토'].forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-header';
+                header.textContent = day;
+                calendar.appendChild(header);
+            });
+
+            // 날짜 생성
+            const records = JSON.parse(localStorage.getItem('attendanceRecords') || '[]');
+            const name = document.getElementById('studentName').value.trim();
+            
+            for (let i = 0; i < 42; i++) {
+                const date = new Date(startDate);
+                date.setDate(startDate.getDate() + i);
+                
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                
+                if (date.getMonth() === month) {
+                    dayElement.textContent = date.getDate();
+                    
+                    const dateStr = date.toLocaleDateString('ko-KR');
+                    const dayRecord = records.find(r => r.date === dateStr && r.name === name);
+                    
+                    if (dayRecord) {
+                        dayElement.classList.add(dayRecord.status);
+                        dayElement.title = `${dayRecord.time} ${dayRecord.status === 'early' ? '얼리버드' : dayRecord.status === 'late' ? '지각' : '정시출석'}`;
+                    } else {
+                        dayElement.classList.add('empty');
+                    }
+                    
+                    if (date.toDateString() === new Date().toDateString()) {
+                        dayElement.classList.add('today');
+                    }
+
+                    // 날짜 클릭 이벤트 추가
+                    dayElement.addEventListener('click', () => showDailyRecords(dateStr));
+                } else {
+                    dayElement.classList.add('empty');
+                }
+                
+                calendar.appendChild(dayElement);
+            }
+        }
+
+        // 통계 업데이트
+        function updateStats() {
+            const year = statsDate.getFullYear();
+            const month = statsDate.getMonth();
+            
+            document.getElementById('statsMonth').textContent = `${year}년 ${month + 1}월`;
+
+            const records = JSON.parse(localStorage.getItem('attendanceRecords') || '[]');
+            const monthRecords = records.filter(r => {
+                const recordDate = new Date(r.timestamp);
+                return recordDate.getFullYear() === year && recordDate.getMonth() === month;
+            });
+
+            const students = [...new Set(monthRecords.map(r => r.name))];
+            const container = document.getElementById('monthlyStats');
+            
+            container.innerHTML = students.map(student => {
+                const studentRecords = monthRecords.filter(r => r.name === student);
+                const early = studentRecords.filter(r => r.status === 'early').length;
+                const late = studentRecords.filter(r => r.status === 'late').length;
+                const total = studentRecords.length;
+                
+                return `
+                    <div class="stat-card">
+                        <h4>${student}</h4>
+                        <div class="stat-number">${total}</div>
+                        <div>총 출석</div>
+                    </div>
+                    <div class="stat-card early">
+                        <h4>🌅 얼리버드</h4>
+                        <div class="stat-number">${early}</div>
+                        <div>${student}</div>
+                    </div>
+                    <div class="stat-card late">
+                        <h4>⏰ 지각</h4>
+                        <div class="stat-number">${late}</div>
+                        <div>${student}</div>
+                    </div>
+                `;
+            }).join('') || '<p>이번 달 출석 기록이 없습니다.</p>';
+        }
+
+        // 일별 출석 현황 모달 표시
+        function showDailyRecords(dateStr) {
+            const records = JSON.parse(localStorage.getItem('attendanceRecords') || '[]')
+                .filter(r => r.date === dateStr)
+                .sort((a,b) => a.timestamp - b.timestamp);
+
+            document.getElementById('modalDate').textContent = `📅 ${dateStr} 출석 현황`;
+            
+            const modalContent = document.getElementById('modalContent');
+            
+            if (records.length === 0) {
+                modalContent.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 20px;">이 날의 출석 기록이 없습니다.</p>';
+            } else {
+                modalContent.innerHTML = records.map(r => {
+                    const statusText = r.status === 'early' ? '🌅 얼리버드' : 
+                                     r.status === 'late' ? '⏰ 지각' : 
+                                     '✅ 정시출석';
+                    return `
+                        <div class="daily-record ${r.status}">
+                            <div>
+                                <strong>${r.name}</strong>
+                                <div style="font-size: 14px; color: #666; margin-top: 5px;">${statusText}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 18px; font-weight: bold;">${r.time}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // 통계 정보 추가
+                const earlyCount = records.filter(r => r.status === 'early').length;
+                const lateCount = records.filter(r => r.status === 'late').length;
+                const ontimeCount = records.filter(r => r.status === 'ontime').length;
+                
+                modalContent.innerHTML += `
+                    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <h4 style="margin-bottom: 10px;">📊 이 날의 통계</h4>
+                        <div style="display: flex; justify-content: space-around; text-align: center;">
+                            <div>
+                                <div style="font-size: 24px; color: #28a745;">🌅 ${earlyCount}</div>
+                                <div style="font-size: 12px;">얼리버드</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 24px; color: #007bff;">✅ ${ontimeCount}</div>
+                                <div style="font-size: 12px;">정시출석</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 24px; color: #dc3545;">⏰ ${lateCount}</div>
+                                <div style="font-size: 12px;">지각</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('dailyModal').style.display = 'block';
+        }
+
+        // 모달 닫기
+        function closeModal() {
+            document.getElementById('dailyModal').style.display = 'none';
+        }
+
+        // 모달 외부 클릭시 닫기
+        window.onclick = function(event) {
+            const modal = document.getElementById('dailyModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // 월 변경 함수들
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            updateCalendar();
+        }
+
+        function changeStatsMonth(delta) {
+            statsDate.setMonth(statsDate.getMonth() + delta);
+            updateStats();
+        }
+    </script>
+</body>
+</html>
